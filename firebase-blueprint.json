@@ -8,7 +8,9 @@
         "uid": { "type": "string" },
         "email": { "type": "string" },
         "displayName": { "type": "string" },
-        "createdAt": { "type": "string", "format": "date-time" }
+        "photoURL": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "lastLogin": { "type": "string", "format": "date-time" }
       },
       "required": ["uid", "email"]
     },
@@ -21,6 +23,7 @@
         "userId": { "type": "string" },
         "fileName": { "type": "string" },
         "fileType": { "type": "string", "enum": ["pdf", "video", "youtube"] },
+        "originalUrl": { "type": "string" },
         "status": { "type": "string", "enum": ["processing", "completed", "failed"] },
         "createdAt": { "type": "string", "format": "date-time" },
         "title": { "type": "string" },

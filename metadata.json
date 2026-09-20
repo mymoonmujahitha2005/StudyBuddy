@@ -1,6 +1,6 @@
 {
-  "name": "MoonBuddy",
-  "description": "Celestial AI Learning - Transform videos and documents into interactive study kits under the moonlight.",
-  "requestFramePermissions": [],
-  "majorCapabilities": []
+  "name": "MoonBuddy AI",
+  "description": "A celestial AI learning companion that transforms study materials (PDFs, PPTX, YouTube, Videos) into interactive study kits with notes, flashcards, quizzes, and mind maps.",
+  "requestFramePermissions": ["camera", "microphone"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }

@@ -1,12 +1,12 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Default deny
+    // 0. Global Safety Net
     match /{document=**} {
       allow read, write: if false;
     }
 
-    // Helper functions
+    // --- PHASE 3: Primitives ---
     function isSignedIn() {
       return request.auth != null;
     }
@@ -19,28 +19,78 @@ service cloud.firestore {
       return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
     }
 
-    // User profiles
-    match /users/{userId} {
-      allow get: if isOwner(userId);
-      allow create: if isOwner(userId) 
-        && request.resource.data.keys().hasAll(['uid', 'email', 'displayName', 'createdAt'])
-        && request.resource.data.uid == request.auth.uid;
-      allow update: if isOwner(userId)
-        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['displayName']);
+    function incoming() {
+      return request.resource.data;
     }
 
-    // Study materials
-    match /materials/{materialId} {
-      allow create: if isSignedIn()
-        && request.resource.data.userId == request.auth.uid
-        && request.resource.data.status in ['processing', 'completed', 'failed']
-        && request.resource.data.createdAt == request.time;
+    function existing() {
+      return resource.data;
+    }
+
+    function isAdmin() {
+      return isSignedIn() && request.auth.token.email == "mymoonmujahitha2005_mca27@mepcoeng.ac.in";
+    }
+
+    // --- PHASE 4: Validation Blueprints ---
+    
+    function isValidUser(data) {
+      return data.keys().hasAll(['uid', 'email', 'createdAt'])
+        && data.keys().size() >= 3
+        && data.uid == request.auth.uid
+        && data.email is string && data.email.size() < 256
+        && data.createdAt == request.time;
+    }
+
+    function isValidStudyMaterial(data) {
+      return data.keys().hasAll(['userId', 'fileName', 'fileType', 'status', 'createdAt'])
+        && data.userId == request.auth.uid
+        && data.fileName is string && data.fileName.size() <= 256
+        && data.fileType in ['pdf', 'video', 'youtube', 'audio', 'image', 'text', 'presentation', 'document', 'file']
+        && data.status in ['processing', 'completed', 'failed']
+        && data.createdAt == request.time
+        // Optional fields if present
+        && (!('title' in data) || (data.title is string && data.title.size() <= 1024))
+        && (!('summary' in data) || (data.summary is string && data.summary.size() <= 5000))
+        && (!('notes' in data) || (data.notes is string && data.notes.size() <= 100000))
+        && (!('mindMap' in data) || (data.mindMap is string && data.mindMap.size() <= 20000))
+        && (!('flashcards' in data) || (data.flashcards is list && data.flashcards.size() <= 50))
+        && (!('quiz' in data) || (data.quiz is list && data.quiz.size() <= 50))
+        && (!('originalUrl' in data) || (data.originalUrl == null || (data.originalUrl is string && data.originalUrl.size() <= 2048)));
+    }
+
+    // --- PHASE 5: Collections ---
+
+    match /users/{userId} {
+      allow get: if isOwner(userId) || isAdmin();
+      allow list: if isAdmin();
       
-      allow read, update, delete: if isSignedIn()
-        && resource.data.userId == request.auth.uid;
-        
-      allow list: if isSignedIn()
-        && resource.data.userId == request.auth.uid;
+      allow create: if isOwner(userId) && isValidUser(incoming());
+      
+      allow update: if isOwner(userId) && (
+        incoming().diff(existing()).affectedKeys().hasOnly(['displayName', 'lastLogin', 'photoURL'])
+        || isAdmin()
+      );
+    }
+
+    match /materials/{materialId} {
+      // Identity Poisoning Guard
+      allow get, delete: if isSignedIn() && isValidId(materialId) && (existing().userId == request.auth.uid || isAdmin());
+      
+      allow list: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin());
+
+      allow create: if isSignedIn() 
+        && isValidId(materialId)
+        && isValidStudyMaterial(incoming());
+
+      allow update: if isSignedIn() 
+        && isValidId(materialId)
+        && (existing().userId == request.auth.uid || isAdmin())
+        && (
+          // Status updates (during processing)
+          (incoming().diff(existing()).affectedKeys().hasOnly(['status', 'updatedAt']) && incoming().status in ['completed', 'failed'])
+          || 
+          isAdmin()
+        );
     }
   }
 }
